@@ -2,6 +2,8 @@ import React, { useContext, useState } from 'react'
 import assets from '../assets/assets';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
+import imageCompression from 'browser-image-compression';
+import axios from 'axios';
 
 
 const ProfilePage = () => {
@@ -13,23 +15,48 @@ const ProfilePage = () => {
   const [name, setName] = useState(authUser.fullName)
   const [bio, setBio] = useState(authUser.bio)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedImg) {
-      await updateProfile({fullName: name, bio});
-      navigate('/')
-      return;
+  
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  try {
+    let imageUrl = null;
+
+    if (selectedImg) {
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 800,
+        useWebWorker: true,
+      };
+
+      const compressedFile = await imageCompression(selectedImg, options);
+
+      const formData = new FormData();
+      formData.append("file", compressedFile);
+      formData.append("upload_preset", "crushbuzz_upload"); // replace with actual preset
+
+      const res = await axios.post(
+        "https://api.cloudinary.com/v1_1/dlgavezoz/upload", // replace with your cloud name
+        formData
+      );
+
+      imageUrl = res.data.secure_url;
     }
 
-    const reader = new FileReader();
-    reader.readAsDataURL(selectedImg);
-    reader.onload = async () => {
-      const base64Image = reader.result;
-      await updateProfile({profilePic: base64Image, fullName: name, bio});
-      navigate('/');
-    }
+    // Now send this to your backend
+    await updateProfile({
+      fullName: name,
+      bio,
+      profilePic: imageUrl,
+    });
 
+    navigate('/');
+  } catch (error) {
+    console.error("Upload failed", error);
+    alert("Image upload failed. Try with a smaller file.");
   }
+};
+
   
   return (
     <div className='min-h-screen bg-cover bg-no-repeat flex items-center justify-center'>
